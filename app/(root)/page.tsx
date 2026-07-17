@@ -1,12 +1,7 @@
-import { ModeToggle } from "@/components/ui/mode-toggle";
-import { UserButton } from "@clerk/nextjs";
+import { startNewChat } from "@/features/home/actions/start-new-chat";
+import { redirect } from "next/navigation";
 
-export default function Home() {
-  return (
-    <div>
-      Ask-GPT
-      <ModeToggle />
-      <UserButton />
-    </div>
-  );
+export default async function Home() {
+  const conversationId = await startNewChat();
+  redirect(`/chat/${conversationId}`);
 }

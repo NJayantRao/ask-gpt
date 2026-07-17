@@ -2,8 +2,9 @@
 
 import { requireUser } from "@/features/auth/action/require-user";
 import prisma from "@/lib/db";
+import { revalidatePath } from "next/cache";
 
-export type ConversationItem = {
+export type ConversationListItem = {
   id: string;
   title: string;
   isPinned: boolean;
@@ -13,115 +14,89 @@ export type ConversationItem = {
   updatedAt: Date;
 };
 
-export const assertConversation = async (
+export async function assertOwnsConversation(
+  conversationId: string,
   userId: string,
+) {
+  const conversation = await prisma.conversation.findFirst({
+    where: {
+      id: conversationId,
+      userId,
+    },
+  });
+
+  if (!conversation) {
+    throw new Error("Conversation not found");
+  }
+
+  return conversation;
+}
+
+export async function getConversation(conversationId: string) {
+  const user = await requireUser();
+  return assertOwnsConversation(conversationId, user.id);
+}
+
+export async function listConversations(): Promise<ConversationListItem[]> {
+  const user = await requireUser();
+
+  return prisma.conversation.findMany({
+    where: { userId: user.id, isArchived: false },
+    orderBy: [{ isPinned: "desc" }, { lastMessagedAt: "desc" }],
+    select: {
+      id: true,
+      title: true,
+      isPinned: true,
+      isArchived: true,
+      lastMessagedAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+}
+
+export async function createConversation(title = "New Chat") {
+  const user = await requireUser();
+
+  return prisma.conversation.create({
+    data: {
+      userId: user.id,
+      title: title.trim() || "New Chat",
+    },
+  });
+}
+
+export async function updateConversation(
   conversationId: string,
-) => {
-  try {
-    const conversation = await prisma.conversation.findFirst({
-      where: {
-        id: conversationId,
-        userId, 
-      },
-    });
+  data: { title?: string; isPinned?: boolean; isArchived?: boolean },
+) {
+  const user = await requireUser();
+  await assertOwnsConversation(conversationId, user.id);
 
-    if (!conversation) {
-      throw new Error("Conversation not found");
-    }
+  const conversation = await prisma.conversation.update({
+    where: { id: conversationId },
+    data: {
+      ...(data.title !== undefined
+        ? { title: data.title.trim() || "New Chat" }
+        : {}),
+      ...(data.isPinned !== undefined ? { isPinned: data.isPinned } : {}),
+      ...(data.isArchived !== undefined ? { isArchived: data.isArchived } : {}),
+    },
+  });
 
-    return conversation;
-  } catch (error) {
-    console.error("Error occurred while asserting conversation:", error);
-    throw new Error("Failed to assert conversation");
-  }
-};
+  revalidatePath("/");
+  revalidatePath(`/c/${conversationId}`);
+  return conversation;
+}
 
-export const getConversations = async (): Promise<ConversationItem[]> => {
-  try {
-    const user = await requireUser();
-    return prisma.conversation.findMany({
-      where: { userId: user.id, isArchived: false },
-      orderBy: [{ isPinned: "desc", lastMessagedAt: "desc" }],
-      select: {
-        id: true,
-        title: true,
-        isPinned: true,
-        isArchived: true,
-        lastMessagedAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-  } catch (error) {
-    console.error("Error occurred while fetching conversations:", error);
-    throw new Error("Failed to fetch conversations");
-  }
-};
+export async function deleteConversation(conversationId: string) {
+  const user = await requireUser();
+  await assertOwnsConversation(conversationId, user.id);
 
-export const createConversation = async (
-  title: string,
-): Promise<ConversationItem> => {
-  try {
-    const user = await requireUser();
-    return prisma.conversation.create({
-      data: {
-        title: title.trim() || "New Chat",
-        userId: user.id,
-      },
-    });
-  } catch (error) {
-    console.error("Error occurred while creating conversation:", error);
-    throw new Error("Failed to create conversation");
-  }
-};
+  await prisma.conversation.delete({
+    where: { id: conversationId },
+  });
 
-export const updateConversation = async (
-  conversationId: string,
-  title?: string,
-  isPinned?: boolean,
-  isArchived?: boolean,
-) => {
-  try {
-    const user = await requireUser();
-
-    await assertConversation(user.id, conversationId);
-
-    return await prisma.conversation.update({
-      where: {
-        id: conversationId,
-      },
-      data: {
-        ...(title !== undefined && { title: title.trim() || "New Chat" }),
-        ...(isPinned !== undefined && { isPinned }),
-        ...(isArchived !== undefined && { isArchived }),
-      },
-      select: {
-        id: true,
-        title: true,
-        isPinned: true,
-        isArchived: true,
-        lastMessagedAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-  } catch (error) {
-    console.error("Error occurred while updating conversation:", error);
-    throw new Error("Failed to update conversation");
-  }
-};
-
-export const deleteConversation = async (conversationId: string) => {
-  try {
-    const user = await requireUser();
-    await assertConversation(user.id, conversationId);
-    return prisma.conversation.delete({
-      where: {
-        id: conversationId,
-      },
-    });
-  } catch (error) {
-    console.error("Error occurred while deleting conversation:", error);
-    throw new Error("Failed to delete conversation");
-  }
-};
+  revalidatePath("/");
+  return { id: conversationId };
+}

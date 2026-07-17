@@ -1,7 +1,7 @@
 "use server";
 
 import { requireUser } from "@/features/auth/action/require-user";
-import { assertConversation } from "@/features/conversations/actions/conversation-actions";
+import { assertOwnsConversation } from "@/features/conversations/actions/conversation-actions";
 import prisma from "@/lib/db";
 import { MessageRole, MessageStatus } from "@/prisma/generated/prisma/enums";
 import { revalidatePath } from "next/cache";
@@ -20,7 +20,7 @@ export const getMessagesList = async (
   conversationId: string,
 ): Promise<MessageItem[]> => {
   const user = await requireUser();
-  await assertConversation(conversationId, user.id);
+  await assertOwnsConversation(conversationId, user.id);
 
   return prisma.message.findMany({
     where: {
@@ -46,7 +46,7 @@ export const createMessage = async (
   content: string,
 ) => {
   const user = await requireUser();
-  const conversation = await assertConversation(conversationId, user.id);
+  const conversation = await assertOwnsConversation(conversationId, user.id);
 
   const normalizedContent = content.trim();
 
@@ -69,7 +69,7 @@ export const createMessage = async (
   await prisma.conversation.update({
     where: { id: conversationId },
     data: {
-      lastMessageAt: new Date(),
+      lastMessagedAt: new Date(),
       ...(rename
         ? {
             title:

@@ -1,87 +1,90 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  createConversation,
-  deleteConversation,
-  getConversations,
-  updateConversation,
-} from "../actions/conversation-actions";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-export const useConversations = () => {
+import {
+  createConversation,
+  deleteConversation,
+  listConversations,
+  updateConversation,
+} from "@/features/conversations/actions/conversation-actions";
+
+export function useConversations() {
   return useQuery({
     queryKey: ["conversations"],
-    queryFn: () => getConversations(),
+    queryFn: () => listConversations(),
   });
-};
+}
 
-export const useCreateConversation = () => {
+export function useCreateConversation() {
   const queryClient = useQueryClient();
   const router = useRouter();
+
   return useMutation({
-    mutationFn: (title: string) => createConversation(title),
+    mutationFn: (title?: string) => createConversation(title),
     onSuccess: (conversation) => {
       void queryClient.invalidateQueries({
         queryKey: ["conversations"],
       });
-      router.push(`/chat/${conversation.id}`);
+      router.push(`/c/${conversation.id}`);
     },
-    onError: (error) => {
-      toast.error(error.message || "Failed to create conversation");
+    onError: (error: Error) => {
+      toast.error(error.message || "Could not create chat");
     },
   });
-};
+}
 
-export const useUpdateConversation = () => {
+export function useUpdateConversation() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({
-      conversationId,
-      title,
-      isPinned,
-      isArchived,
+      id,
+      ...data
     }: {
-      conversationId: string;
+      id: string;
       title?: string;
       isPinned?: boolean;
       isArchived?: boolean;
-    }) => updateConversation(conversationId, title, isPinned, isArchived),
-
-    onSuccess: () => {
+    }) => updateConversation(id, data),
+    onSuccess: (conversation) => {
       void queryClient.invalidateQueries({
         queryKey: ["conversations"],
       });
-
-      toast.success("Conversation updated");
+      void queryClient.invalidateQueries({
+        queryKey: ["messages", conversation.id],
+      });
     },
-
-    onError: (error) => {
-      toast.error(error.message || "Failed to update conversation");
+    onError: (error: Error) => {
+      toast.error(error.message || "Could not update chat");
     },
   });
-};
+}
 
-export const useDeleteConversation = () => {
+export function useDeleteConversation(activeId?: string) {
   const queryClient = useQueryClient();
   const router = useRouter();
 
   return useMutation({
-    mutationFn: (conversationId: string) => deleteConversation(conversationId),
-
-    onSuccess: () => {
+    mutationFn: (id: string) => deleteConversation(id),
+    onSuccess: ({ id }) => {
       void queryClient.invalidateQueries({
         queryKey: ["conversations"],
       });
+      queryClient.removeQueries({
+        queryKey: ["messages", id],
+      });
 
-      router.push("/");
-      toast.success("Conversation deleted");
+      if (activeId === id) {
+        router.push("/");
+      }
+
+      toast.success("Chat deleted");
     },
-
-    onError: (error) => {
-      toast.error(error.message || "Failed to delete conversation");
+    onError: (error: Error) => {
+      toast.error(error.message || "Could not delete chat");
     },
   });
-};
+}

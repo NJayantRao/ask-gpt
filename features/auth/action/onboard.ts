@@ -17,8 +17,6 @@ export const onBoard = async () => {
       throw new Error("Email not found");
     }
 
-    console.log("reached here 1");
-
     return prisma.user.upsert({
       where: {
         clerkId: clerkUser.id,
