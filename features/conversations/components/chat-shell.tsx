@@ -1,4 +1,4 @@
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { ReactNode } from "react";
 import { AppSidebar } from "./app-sidebar";
 
@@ -7,7 +7,7 @@ const ChatShell = ({ children }: { children: ReactNode }) => {
     <div>
       <SidebarProvider>
         <AppSidebar />
-        {children}
+        <SidebarInset className="h-screen">{children}</SidebarInset>
       </SidebarProvider>
     </div>
   );

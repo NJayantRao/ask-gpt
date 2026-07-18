@@ -51,7 +51,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { data: conversations, isLoading } = useConversations();
 
-  const activeId = pathname.startsWith("/c/")
+  const activeId = pathname.startsWith("/chat/")
     ? pathname.split("/")[2]
     : undefined;
 
@@ -66,9 +66,9 @@ export function AppSidebar() {
               render={<Link href="/" />}
             >
               <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-sm text-primary-foreground">
-                C
+                A
               </span>
-              <span>ChaiGPT</span>
+              <span>AskGPT</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
@@ -167,7 +167,7 @@ function ChatItem({
       <SidebarMenuButton
         isActive={isActive}
         tooltip={conversation.title}
-        render={<Link href={`/c/${conversation.id}`} />}
+        render={<Link href={`/chat/${conversation.id}`} />}
         className={cn(isActive && "font-medium")}
       >
         <span className="truncate">{conversation.title}</span>
