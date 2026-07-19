@@ -1,13 +1,13 @@
-import { groq } from "@ai-sdk/groq";
 import { calculatorTool } from "./calculator";
-import { getWeatherTool } from "./weather";
 import { getCurrentDateTimeTool } from "./date-time";
+import { getWeatherTool } from "./weather";
+import { webSearchTool } from "./web-search";
 
 export const tools = {
   calculator: calculatorTool,
   getCurrentDateTime: getCurrentDateTimeTool,
   getWeather: getWeatherTool,
-  browser_search: groq.tools.browserSearch({}),
+  webSearch: webSearchTool,
 };
 
 export type ChatTools = typeof tools;
