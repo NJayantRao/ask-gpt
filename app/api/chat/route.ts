@@ -10,12 +10,14 @@ import {
   convertToModelMessages,
   createIdGenerator,
   createUIMessageStreamResponse,
+  stepCountIs,
   streamText,
   toUIMessageStream,
   type UIMessage,
 } from "ai";
 import { NextRequest, NextResponse } from "next/server";
 import { SYSTEM_PROMPT } from "@/data/system-prompt";
+import { tools } from "@/features/ai/tools/tool";
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,15 +66,31 @@ export async function POST(request: NextRequest) {
       model: getChatModel(conversation.model),
       system: SYSTEM_PROMPT ?? "You are AskGpt , a helpful assistant",
       messages: await convertToModelMessages(messages),
+      tools,
+      // Allow the model to call a tool, see its result, and respond in the
+      // same turn (up to 5 total steps) instead of stopping after one call.
+      stopWhen: stepCountIs(5),
     });
 
-    result.consumeStream();
+    result.consumeStream({
+      onError: (error) => {
+        console.error("Error while consuming stream:", error);
+      },
+    });
 
     return createUIMessageStreamResponse({
       stream: toUIMessageStream({
         stream: result.stream,
         originalMessages: messages,
         generateMessageId: createIdGenerator({ prefix: "msg", size: 16 }),
+        onError: (error) => {
+          console.error("Error while streaming response:", error);
+          // Keep the raw provider error out of the client-facing message —
+          // this is what shows up as the assistant's reply if the model
+          // (or Groq's API) fails mid-turn, e.g. the known Groq/gpt-oss
+          // "Tool choice is none, but model called a tool" 400.
+          return "Sorry, something went wrong generating a response. Please try again.";
+        },
         onEnd: async ({ messages: finalMessages }) => {
           try {
             await saveChatMessages(id, finalMessages, { updateTitle: false });

@@ -1,36 +1,31 @@
 "use client";
 
-import { isTextUIPart, type UIMessage } from "ai";
+import { isTextUIPart, isToolUIPart, type UIMessage } from "ai";
 import type { ChatStatus } from "ai";
 
 import {
   Conversation,
   ConversationContent,
-  ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import {
   Message,
   MessageContent,
   MessageResponse,
 } from "@/components/ai-elements/message";
+import {
+  Tool,
+  ToolContent,
+  ToolHeader,
+  ToolInput,
+  ToolOutput,
+} from "@/components/ai-elements/tool";
 import { Loader } from "@/components/ai-elements/loader";
-
-/** Extracts plain text from a `UIMessage` by joining all text parts. */
-function getMessageText(message: UIMessage) {
-  return message.parts
-    .filter(isTextUIPart)
-    .map((part) => part.text)
-    .join("");
-}
 
 type ChatMessagesProps = {
   messages: UIMessage[];
   status: ChatStatus;
 };
 
-/**
- * Renders the conversation message list with markdown responses and a loading indicator.
- */
 export function ChatMessages({ messages, status }: ChatMessagesProps) {
   const isWaiting = status === "submitted" && messages.at(-1)?.role === "user";
 
@@ -40,7 +35,45 @@ export function ChatMessages({ messages, status }: ChatMessagesProps) {
         {messages.map((message) => (
           <Message key={message.id} from={message.role}>
             <MessageContent>
-              <MessageResponse>{getMessageText(message)}</MessageResponse>
+              {message.parts.map((part, index) => {
+                if (isTextUIPart(part)) {
+                  return (
+                    <MessageResponse key={`${message.id}-text-${index}`}>
+                      {part.text}
+                    </MessageResponse>
+                  );
+                }
+
+                if (isToolUIPart(part)) {
+                  return (
+                    <Tool
+                      key={part.toolCallId ?? `${message.id}-tool-${index}`}
+                    >
+                      <ToolHeader type={part.type} state={part.state} />
+                      <ToolContent>
+                        <ToolInput input={part.input} />
+                        {(part.state === "output-available" ||
+                          part.state === "output-error") && (
+                          <ToolOutput
+                            output={
+                              part.state === "output-available"
+                                ? part.output
+                                : undefined
+                            }
+                            errorText={
+                              part.state === "output-error"
+                                ? part.errorText
+                                : undefined
+                            }
+                          />
+                        )}
+                      </ToolContent>
+                    </Tool>
+                  );
+                }
+
+                return null;
+              })}
             </MessageContent>
           </Message>
         ))}
